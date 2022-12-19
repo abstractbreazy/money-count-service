@@ -1,0 +1,61 @@
+version: 2.1
+
+# Snippets for jobs:
+setup_env: &setup_env
+  run:
+    name: Setup environment
+    command: |
+      test -d ~/.ssh || install -m 0700 -d ~/.ssh
+      test -f ~/.ssh/config || install -m 0600 /dev/null ~/.ssh/config
+      test -d /run/.ssh && sudo sh -c "cp /run/.ssh/* $HOME/.ssh/; chown -R circleci:circleci $HOME/.ssh" || true # For scripts/test-ci-circle.
+      test -d ~/.cache && sudo chown -R circleci:circleci ~/go ~/.cache || true # For scripts/test-ci-circle.
+      echo -e 'Host *\n\tStrictHostKeyChecking accept-new' >> ~/.ssh/config
+      git config --global url.ssh://git@github.com/.insteadOf https://github.com/
+
+jobs:
+  test:
+    docker:
+      - image: "cimg/go:1.16"
+        environment:
+          GOFLAGS: "-mod=readonly"
+          EXAMPLE_APIKEY_ADMIN: "admin"
+          EXAMPLE_MYSQL_ADDR_HOST: "localhost"
+          EXAMPLE_MYSQL_AUTH_LOGIN: "root"
+          EXAMPLE_MYSQL_AUTH_PASS: ""
+      - image: "mysql:5.6"
+        environment:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+    steps:
+      - checkout
+      - *setup_env
+      - restore_cache:
+          keys:
+            - v3-{{ checksum "go.mod" }}-{{ .Branch }}
+            - v3-{{ checksum "go.mod" }}-
+            - v3-
+      - run: scripts/test
+      - run:
+          name: Ensure API spec match auto-generated code
+          command: |
+            go generate ./api/...
+            git add . && git status --short && git diff-index --quiet HEAD
+      - run:
+          name: Report code coverage
+          command: |
+            scripts/cover
+            # .gobincache/goveralls -coverprofile=cover.out -service=CircleCI
+      - save_cache:
+          when: always
+          key: v3-{{ checksum "go.mod" }}-{{ .Branch }}
+          paths:
+            - ~/go/bin/
+            - ~/go/pkg/
+            - ~/go/src/
+            - ~/.cache/go-build/
+            - ~/.cache/golangci-lint/
+            - .gobincache/
+
+workflows:
+  default:
+    jobs:
+      - test

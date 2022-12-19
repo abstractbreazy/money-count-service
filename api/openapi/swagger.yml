@@ -1,0 +1,136 @@
+swagger: '2.0'
+
+info:
+  title: Address Book
+  version: 0.2.0
+  description: |
+    # ...
+    ## List of all custom errors
+    First number is HTTP Status code, second is value of "code" field in returned JSON object, text description may or may not match "message" field in returned JSON object.
+    - 409.1000: contact already exists
+basePath: /
+schemes:
+  - http
+
+securityDefinitions:
+  api_key:
+    type: apiKey
+    in: header
+    name: API-Key
+
+definitions:
+  # This model should match output of api.ServeError handler, to ensure
+  # errors returned by go-swagger (like failed validation) use same
+  # format as general errors returned by our handlers.
+  # By default api.ServeError = github.com/go-openapi/errors.ServeError.
+  Error:
+    type: object
+    required:
+      - code
+      - message
+    properties:
+      code:
+        description: Either same as HTTP Status Code OR >= 600 with HTTP Status Code 422.
+        type: integer
+        format: int32
+      message:
+        type: string
+
+  SeekPagination:
+    type: object
+    description: Query paginated list starting with a specific item.
+    required:
+      - since_id
+      - limit
+    properties:
+      since_id:
+        description: Include items with ID greater than since_id.
+        type: integer
+        format: int32
+        minimum: 0
+      limit:
+        description: Maximum amount of items to return.
+        type: integer
+        format: int32
+        minimum: 1
+        maximum: 100
+
+  Contact:
+    type: object
+    required:
+      - name
+    properties:
+      id:
+        type: integer
+        format: int32
+        readOnly: true
+      name:
+        type: string
+        minLength: 1
+
+responses:
+  GenericError:
+    description: General errors using same model as used by go-swagger for validation errors.
+    schema:
+      $ref: '#/definitions/Error'
+
+security:
+  - api_key: []
+consumes:
+  - application/json
+produces:
+  - application/json
+
+paths:
+  /health-check:
+    get:
+      operationId: healthCheck
+      description: Returns 200 if service works okay.
+      security: []
+      responses:
+        '200':
+          description: Extra details about service status, if any.
+          schema:
+            type: object
+            additionalProperties: true
+        default: {$ref: '#/responses/GenericError'}
+
+  /contacts:
+    get:
+      operationId: listContacts
+      description: Return all contacts ordered by ID ASC using pagination.
+      parameters:
+        - name: args
+          required: true
+          in: body
+          schema:
+            allOf:
+              - $ref: '#/definitions/SeekPagination'
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Contact'
+        default: {$ref: '#/responses/GenericError'}
+
+    post:
+      operationId: addContact
+      description: Add new contact.
+      parameters:
+        - name: args
+          required: true
+          in: body
+          schema:
+            $ref: '#/definitions/Contact'
+      responses:
+        '201':
+          description: Contact added.
+          schema:
+            $ref: '#/definitions/Contact'
+        default:
+          description: |
+            - 409.1000: contact already exists
+          schema:
+            $ref: '#/definitions/Error'
