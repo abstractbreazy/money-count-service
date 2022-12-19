@@ -16,7 +16,7 @@ require (
 	github.com/go-swagger/go-swagger v0.25.0
 	github.com/golang/mock v1.5.0
 	github.com/golangci/golangci-lint v1.40.1
-	github.com/jessevdk/go-flags v1.4.0
+	github.com/jessevdk/go-flags v1.5.0
 	github.com/jmoiron/sqlx v1.3.4
 	github.com/lib/pq v1.9.0
 	github.com/mattn/goveralls v0.0.9
